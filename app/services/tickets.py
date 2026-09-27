@@ -53,10 +53,6 @@ class TicketService:
     def find_by_id(self, ticket_id: int) -> Ticket | None:
         return self.by_id(ticket_id)
 
-    def list_by_status(self, status: TicketStatus | str) -> list[Ticket]:
-        ticket_status = TicketStatus(status)
-        return [ticket for ticket in self._tickets if ticket.status is ticket_status]
-
     def assign_technician(self, ticket_id: int, technician_id: int) -> Assignment:
         ticket = self._require_ticket(ticket_id)
         ticket.assignee_id = technician_id
@@ -96,7 +92,39 @@ class TicketService:
         return comment
 
     def assigned_to(self, technician_id: int) -> list[Ticket]:
-        return [ticket for ticket in self._tickets if ticket.assignee_id == technician_id]
+        return self.list_by_technician(technician_id)
+
+    # ---------- Semana 9: consultas del negocio ----------
+
+    def list_by_technician(self, technician_id: int) -> list[Ticket]:
+        """Return tickets assigned to one technician.
+
+        Pregunta del negocio: que tickets tiene asignados este tecnico?
+        Usa la relacion assignee_id que crea assign_technician (Semana 8).
+        """
+        return [
+            ticket for ticket in self._tickets
+            if ticket.assignee_id == technician_id
+        ]
+
+    def list_by_category(self, category: str) -> list[Ticket]:
+        """Return tickets that belong to one category.
+
+        Pregunta del negocio: que tickets pertenecen a la categoria Hardware?
+        Acepta "hardware" o " Hardware " y valida contra CATEGORIES,
+        igual que create(), para no aceptar categorias que no existen.
+        """
+        wanted = self._normalize_category(category)
+        return [ticket for ticket in self._tickets if ticket.category == wanted]
+
+    def list_by_status(self, status: TicketStatus | str) -> list[Ticket]:
+        """Return tickets with a specific status.
+
+        Pregunta del negocio: que tickets siguen abiertos o en proceso?
+        Acepta TicketStatus.OPEN, "open", "OPEN" o "In Progress".
+        """
+        wanted = self._normalize_status(status)
+        return [ticket for ticket in self._tickets if ticket.status is wanted]
 
     def change_status(
         self,
@@ -153,3 +181,21 @@ class TicketService:
             raise ValueError("category is invalid")
         if priority not in PRIORITIES:
             raise ValueError("priority is invalid")
+
+    @staticmethod
+    def _normalize_category(category: str) -> str:
+        wanted = category.strip().casefold()
+        for name in CATEGORIES:
+            if name.casefold() == wanted:
+                return name
+        raise ValueError("category is invalid")
+
+    @staticmethod
+    def _normalize_status(status: TicketStatus | str) -> TicketStatus:
+        if isinstance(status, TicketStatus):
+            return status
+        text = str(status).strip().casefold().replace(" ", "_").replace("-", "_")
+        for member in TicketStatus:
+            if text in (member.value, member.name.casefold()):
+                return member
+        raise ValueError(f"status is invalid: {status}")
